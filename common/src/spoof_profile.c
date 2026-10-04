@@ -30,6 +30,8 @@ static char *slot(spoof_profile *p, const char *k) {
     if (!strcmp(k,"country_iso")) return p->country_iso;
     if (!strcmp(k,"serial")) return p->serial;
     if (!strcmp(k,"hook_mode")) return p->hook_mode;
+    if (!strcmp(k,"active")) return p->active;
+    if (!strcmp(k,"allowed")) return p->allowed;
     if (!strcmp(k,"scope")) return p->scope;
     if (!strcmp(k,"timezone")) return p->timezone;
     if (!strcmp(k,"sim_operator_name")) return p->sim_operator_name;
@@ -72,6 +74,36 @@ int spoof_profile_load(spoof_profile *p, const char *path) {
     }
     fclose(f);
     return 0;
+}
+
+int spoof_profile_load_for_package(spoof_profile *p, const char *path, const char *package_name) {
+    if (!p || !path || !package_name || !*package_name) return -1;
+    FILE *f = fopen(path, "re");
+    if (!f) return -2;
+    char prefix[256];
+    if (snprintf(prefix, sizeof(prefix), "app.%s.", package_name) >= (int)sizeof(prefix)) {
+        fclose(f);
+        return -1;
+    }
+    int found = 0;
+    char line[768];
+    while (fgets(line, sizeof(line), f)) {
+        trim(line);
+        if (!line[0] || line[0] == '#') continue;
+        char *eq = strchr(line, '=');
+        if (!eq) continue;
+        *eq++ = 0;
+        trim(line); trim(eq);
+        size_t n = strlen(prefix);
+        if (strncmp(line, prefix, n) != 0) continue;
+        const char *key = line + n;
+        char *dst = slot(p, key);
+        if (!dst) continue;
+        snprintf(dst, SPOOF_MAX_VALUE, "%s", eq);
+        found = 1;
+    }
+    fclose(f);
+    return found ? 0 : -3;
 }
 
 const char *spoof_profile_get(const spoof_profile *p, const char *key) {
