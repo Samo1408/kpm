@@ -374,6 +374,10 @@ static bool load_app_profile_for_package(const std::string &package_name) {
     spoof_profile candidate;
     spoof_profile_init(&candidate);
     int shared_result = spoof_profile_load_for_package(&candidate, kSharedConfigPath, package_name.c_str());
+    if (shared_result != 0 && access(kSharedConfigPath, F_OK) == 0) {
+        LOGI("Per-app config lookup: package=%s result=%d path=%s (0=found, -2=unreadable, -3=no matching app keys)",
+             package_name.c_str(), shared_result, kSharedConfigPath);
+    }
     if (shared_result == 0) {
         if (strcmp(candidate.active, "true") != 0 && strcmp(candidate.active, "1") != 0) {
             g_skip_app_runtime = true;
