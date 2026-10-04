@@ -5,6 +5,7 @@
 #include <jni.h>
 #include <cstdlib>
 #include <cstring>
+#include <climits>
 #include <string>
 #include <unistd.h>
 
@@ -114,13 +115,34 @@ static jstring hooked_get_2(JNIEnv *env, jclass c, jstring key, jstring def) {
 }
 
 static jint hooked_get_int(JNIEnv *env, jclass c, jstring key, jint def) {
-    return orig_get_int ? orig_get_int(env,c,key,def) : def;
+    std::string k = jstr(env, key);
+    std::string v = spoof_for_property(k.c_str());
+    if (!v.empty()) {
+        char *end = nullptr;
+        long parsed = strtol(v.c_str(), &end, 0);
+        if (end && end != v.c_str() && *end == '\0' &&
+                parsed >= INT_MIN && parsed <= INT_MAX) return (jint)parsed;
+    }
+    return orig_get_int ? orig_get_int(env, c, key, def) : def;
 }
 static jlong hooked_get_long(JNIEnv *env, jclass c, jstring key, jlong def) {
-    return orig_get_long ? orig_get_long(env,c,key,def) : def;
+    std::string k = jstr(env, key);
+    std::string v = spoof_for_property(k.c_str());
+    if (!v.empty()) {
+        char *end = nullptr;
+        long long parsed = strtoll(v.c_str(), &end, 0);
+        if (end && end != v.c_str() && *end == '\0') return (jlong)parsed;
+    }
+    return orig_get_long ? orig_get_long(env, c, key, def) : def;
 }
 static jboolean hooked_get_bool(JNIEnv *env, jclass c, jstring key, jboolean def) {
-    return orig_get_bool ? orig_get_bool(env,c,key,def) : def;
+    std::string k = jstr(env, key);
+    std::string v = spoof_for_property(k.c_str());
+    if (!v.empty()) {
+        if (v == "1" || v == "true" || v == "y" || v == "yes" || v == "on") return JNI_TRUE;
+        if (v == "0" || v == "false" || v == "n" || v == "no" || v == "off") return JNI_FALSE;
+    }
+    return orig_get_bool ? orig_get_bool(env, c, key, def) : def;
 }
 
 static void set_build_field(const char *name, const char *value) {
@@ -218,12 +240,33 @@ static jstring sem_hook_get_2(JNIEnv *env, jclass c, jstring key, jstring def) {
 }
 
 static jint sem_hook_get_int(JNIEnv *env, jclass c, jstring key, jint def) {
+    std::string k = jstr(env, key);
+    std::string v = spoof_for_property(k.c_str());
+    if (!v.empty()) {
+        char *end = nullptr;
+        long parsed = strtol(v.c_str(), &end, 0);
+        if (end && end != v.c_str() && *end == '\0' &&
+                parsed >= INT_MIN && parsed <= INT_MAX) return (jint)parsed;
+    }
     return sem_orig_get_int ? sem_orig_get_int(env, c, key, def) : def;
 }
 static jlong sem_hook_get_long(JNIEnv *env, jclass c, jstring key, jlong def) {
+    std::string k = jstr(env, key);
+    std::string v = spoof_for_property(k.c_str());
+    if (!v.empty()) {
+        char *end = nullptr;
+        long long parsed = strtoll(v.c_str(), &end, 0);
+        if (end && end != v.c_str() && *end == '\0') return (jlong)parsed;
+    }
     return sem_orig_get_long ? sem_orig_get_long(env, c, key, def) : def;
 }
 static jboolean sem_hook_get_bool(JNIEnv *env, jclass c, jstring key, jboolean def) {
+    std::string k = jstr(env, key);
+    std::string v = spoof_for_property(k.c_str());
+    if (!v.empty()) {
+        if (v == "1" || v == "true" || v == "y" || v == "yes" || v == "on") return JNI_TRUE;
+        if (v == "0" || v == "false" || v == "n" || v == "no" || v == "off") return JNI_FALSE;
+    }
     return sem_orig_get_bool ? sem_orig_get_bool(env, c, key, def) : def;
 }
 
