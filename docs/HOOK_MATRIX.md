@@ -31,6 +31,19 @@ Per-app runtime initialization runs only in matching app processes. A global pro
 | Country ISO | Profile export supported | Property-layer mapping; Samsung CSC/Wi-Fi and Telephony Java APIs can still report a different country |
 | SIM/operator Java APIs | Not ported to Native | Existing LSPosed hooks remain available |
 | Android ID, GSF ID, App Set ID, Widevine, location, User-Agent, procfs | Not ported to Native | Requires dedicated per-API native/runtime implementations; not implied by the mode switch |
-| KPM | Lifecycle foundation only | No kernel hooks are implemented in `kpm/main.c` |
+| KPM | Lifecycle/control foundation only | No identity hooks are implemented in `kpm/main.c`; it must not be described as an active spoof engine |
 | SIM/network operator numeric + name | Property-layer export supported | Maps `gsm.operator.*` and `gsm.sim.operator.*` properties; does not replace every `TelephonyManager` API |
 | Time zone | Property-layer export supported | Maps `persist.sys.timezone`; Java/system time-zone services may cache their own value |
+
+
+## Mode isolation audit (2026-10-04)
+
+- `hookMode=native`: `MainHook.installForPackage()` now exits before installing any LSPosed/libxposed hooks. Zygisk remains the native userspace engine.
+- `hookMode=lsposed` or missing legacy value: existing LSPosed hook registration remains unchanged.
+- KPM remains a lifecycle/control stub until the project is built against the exact KernelPatch headers and a per-app kernel hook design is validated. No global kernel spoof hook is enabled as a fallback.
+- `SystemProperties.native_get_int/long/boolean` now parse configured mapped property values where valid and delegate to the original method for missing/invalid values.
+
+
+## Build backend note
+
+The bundled KPM build backend is KPatch Next (`third_party/KPatch-Next-EXP`). Its version is recorded in that tree’s `version` file. KPM remains lifecycle/control-only until an explicit, validated implementation exists; the Zygisk and LSPosed modes are not silently replaced by a global kernel hook.
