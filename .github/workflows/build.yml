@@ -106,7 +106,7 @@ jobs:
           cp universal-samsung-spoof-zygisk-alpha2.zip dist/complete/
           cp kpm/universal-samsung-spoof.kpm dist/complete/
           cp docs/HOOK_MATRIX.md dist/complete/
-          cp universal-spoof-ui-debug.apk dist/complete/UniversalSpoofUI-debug.apk
+          #cp universal-spoof-ui-debug.apk dist/complete/UniversalSpoofUI-debug.apk
           cd dist/complete
           zip -r ../../universal-samsung-spoof-complete-alpha2.zip .
 
@@ -118,4 +118,4 @@ jobs:
             universal-samsung-spoof-zygisk-alpha2.zip
             universal-samsung-spoof-complete-alpha2.zip
             dist/complete/universal-samsung-spoof.kpm
-            universal-spoof-ui-debug.apk
+            #universal-spoof-ui-debug.apk
