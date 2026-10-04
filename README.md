@@ -48,3 +48,14 @@ It downloads Arm GNU Toolchain 14.3.rel1 for the GitHub runner and places
 The workflow now uses the Android SDK already provisioned on GitHub-hosted Ubuntu runners.
 It calls `sdkmanager` directly and installs only NDK 27.2.12479018; it no longer uses
 `android-actions/setup-android`, which was attempting to install the obsolete `tools` package.
+
+## Phase 4
+
+Phase 4 adds the Samsung/framework-facing layer without modifying `framework.jar`:
+
+- `android/os/SemSystemProperties`: probes native `get`, `getInt`, `getLong`, `getBoolean`, and `native_get` variants.
+- Serial coverage: `ro.serialno`, `ril.serialnumber`, and `sys.serialnumber` are spoofed through the SystemProperties/SemSystemProperties layers; `Build.getSerial()` is detected at runtime but is not patched through unstable ART `ArtMethod` entry-point rewriting.
+- Country coverage: `gsm.operator.iso-country`, `gsm.sim.operator.iso-country`, `persist.sys.country`, and `ro.product.locale.region` are covered by the property layer.
+- `TelephonyManager.getNetworkCountryIso()`, `getNetworkCountryIso(int)`, and `getSimCountryIso()` are probed and logged when present.
+
+The module remains boot-safe: an unavailable native method is skipped and the original implementation/value is preserved.
