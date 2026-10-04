@@ -49,11 +49,15 @@ jobs:
           test -x "$ANDROID_HOME/ndk/27.2.12479018/ndk-build"
 
       - name: Build Zygisk ARM64
-        env:
-          ANDROID_NDK: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+        shell: bash
         run: |
+          set -euo pipefail
+          ANDROID_NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          test -x "$ANDROID_NDK/ndk-build"
+          echo "Using NDK: $ANDROID_NDK"
+          "$ANDROID_NDK/ndk-build" --version
           cd zygisk/jni
-          "$ANDROID_NDK/ndk-build" NDK_PROJECT_PATH="$PWD" APP_BUILD_SCRIPT="$PWD/Android.mk" NDK_APPLICATION_MK="$PWD/Application.mk"
+          "$ANDROID_NDK/ndk-build"             NDK_PROJECT_PATH="$PWD"             APP_BUILD_SCRIPT="$PWD/Android.mk"             NDK_APPLICATION_MK="$PWD/Application.mk"
           test -f libs/arm64-v8a/libuniversal_spoof.so
 
       - name: Checkout KernelPatch
