@@ -20,7 +20,20 @@ jobs:
       - name: Install host dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip zip make gcc-aarch64-none-elf binutils-aarch64-none-elf
+          sudo apt-get install -y unzip zip make curl xz-utils
+
+      - name: Install AArch64 bare-metal toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLCHAIN_VERSION=14.3.rel1
+          TOOLCHAIN_ARCHIVE=arm-gnu-toolchain-${TOOLCHAIN_VERSION}-x86_64-aarch64-none-elf.tar.xz
+          TOOLCHAIN_URL=https://developer.arm.com/-/media/Files/downloads/gnu/${TOOLCHAIN_VERSION}/binrel/${TOOLCHAIN_ARCHIVE}
+          curl -L --fail --retry 5 --retry-all-errors "$TOOLCHAIN_URL" -o "$RUNNER_TEMP/$TOOLCHAIN_ARCHIVE"
+          tar -xJf "$RUNNER_TEMP/$TOOLCHAIN_ARCHIVE" -C "$RUNNER_TEMP"
+          TOOLCHAIN_DIR="$RUNNER_TEMP/${TOOLCHAIN_ARCHIVE%.tar.xz}"
+          echo "$TOOLCHAIN_DIR/bin" >> "$GITHUB_PATH"
+          "$TOOLCHAIN_DIR/bin/aarch64-none-elf-gcc" --version
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -45,7 +58,9 @@ jobs:
       - name: Build KPM
         run: |
           export TARGET_COMPILE=aarch64-none-elf-
-          make -C kpm KP_DIR="$GITHUB_WORKSPACE/KernelPatch"
+          command -v aarch64-none-elf-gcc
+          make -C kpm clean
+          make -C kpm KP_DIR="$GITHUB_WORKSPACE/KernelPatch" TARGET_COMPILE="$TARGET_COMPILE"
           test -f kpm/universal-samsung-spoof.kpm
 
       - name: Package Zygisk module
