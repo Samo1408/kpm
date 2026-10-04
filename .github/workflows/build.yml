@@ -1,4 +1,4 @@
-name: Build Universal Samsung Spoof
+name: Build Universal Samsung Spoof - Phase 1-3
 
 on:
   workflow_dispatch:
