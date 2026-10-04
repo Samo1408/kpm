@@ -5,6 +5,7 @@
 #include <jni.h>
 #include <cstdlib>
 #include <cstring>
+#include <cctype>
 #include <string>
 
 #define TAG "UniversalSamsungSpoof"
@@ -20,6 +21,17 @@ static bool g_runtime_initialized = false;
 static bool g_skip_app_runtime = false;
 
 static bool nonempty(const char *s) { return s && *s; }
+
+// Android Telephony country ISO properties are conventionally lower-case,
+// while ro.product.locale.region is an upper-case region subtag. Keep these
+// representations separate so one does not leak into the other.
+static std::string telephony_country_iso() {
+    const char *src = nonempty(g_profile.country_iso_lower)
+        ? g_profile.country_iso_lower : g_profile.country_iso;
+    std::string out = src ? src : "";
+    for (char &ch : out) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    return out;
+}
 
 static std::string spoof_for_property(const char *key) {
     if (!key) return {};
@@ -54,8 +66,14 @@ static std::string spoof_for_property(const char *key) {
 
     // Telephony country / operator properties. These are the lowest-risk
     // framework-facing layer and are used by several Android/Samsung paths.
-    else if (!strcmp(key, "gsm.operator.iso-country")) v = g_profile.country_iso;
-    else if (!strcmp(key, "gsm.sim.operator.iso-country")) v = g_profile.country_iso;
+    else if (!strcmp(key, "gsm.operator.iso-country")) {
+        std::string iso = telephony_country_iso();
+        return iso;
+    }
+    else if (!strcmp(key, "gsm.sim.operator.iso-country")) {
+        std::string iso = telephony_country_iso();
+        return iso;
+    }
     else if (!strcmp(key, "gsm.operator.numeric")) v = g_profile.network_operator;
     else if (!strcmp(key, "gsm.operator.alpha")) v = g_profile.network_operator_name;
     else if (!strcmp(key, "gsm.sim.operator.numeric")) v = g_profile.sim_operator;
@@ -178,70 +196,15 @@ static void install_system_property_hooks() {
 }
 
 
-// Samsung's SemSystemProperties has changed implementation details between
-// One UI / Android releases. We therefore probe several native signatures.
-// hookJniNativeMethods() leaves fnPtr == nullptr when a method is not native
-// or does not exist, so unsupported variants are harmless.
-static jstring (*sem_orig_get_1)(JNIEnv*, jclass, jstring) = nullptr;
-static jstring (*sem_orig_get_2)(JNIEnv*, jclass, jstring, jstring) = nullptr;
-static jint (*sem_orig_get_int)(JNIEnv*, jclass, jstring, jint) = nullptr;
-static jlong (*sem_orig_get_long)(JNIEnv*, jclass, jstring, jlong) = nullptr;
-static jboolean (*sem_orig_get_bool)(JNIEnv*, jclass, jstring, jboolean) = nullptr;
-
-static jstring sem_hook_get_1(JNIEnv *env, jclass c, jstring key) {
-    std::string k = jstr(env, key);
-    std::string v = spoof_for_property(k.c_str());
-    if (!v.empty()) {
-        LOGI("SemSystemProperties.get spoof: %s=%s", k.c_str(), v.c_str());
-        return env->NewStringUTF(v.c_str());
-    }
-    return sem_orig_get_1 ? sem_orig_get_1(env, c, key) : nullptr;
-}
-
-static jstring sem_hook_get_2(JNIEnv *env, jclass c, jstring key, jstring def) {
-    std::string k = jstr(env, key);
-    std::string v = spoof_for_property(k.c_str());
-    if (!v.empty()) {
-        LOGI("SemSystemProperties.get(def) spoof: %s=%s", k.c_str(), v.c_str());
-        return env->NewStringUTF(v.c_str());
-    }
-    return sem_orig_get_2 ? sem_orig_get_2(env, c, key, def) : def;
-}
-
-static jint sem_hook_get_int(JNIEnv *env, jclass c, jstring key, jint def) {
-    return sem_orig_get_int ? sem_orig_get_int(env, c, key, def) : def;
-}
-static jlong sem_hook_get_long(JNIEnv *env, jclass c, jstring key, jlong def) {
-    return sem_orig_get_long ? sem_orig_get_long(env, c, key, def) : def;
-}
-static jboolean sem_hook_get_bool(JNIEnv *env, jclass c, jstring key, jboolean def) {
-    return sem_orig_get_bool ? sem_orig_get_bool(env, c, key, def) : def;
-}
-
+// SemSystemProperties.get* methods are Java wrappers on many Samsung builds,
+// not JNI-native methods. Zygisk's hookJniNativeMethods API cannot replace
+// ordinary ART Java methods, so probing them as native variants always yields
+// 0/N on those builds and gives a misleading impression of missing native hooks.
+// These wrappers commonly delegate to android.os.SystemProperties, whose JNI
+// methods are hooked above. We log this limitation explicitly rather than
+// attempting unsafe ART entry-point patching that varies by Android release.
 static void install_sem_system_properties_hooks() {
-    JNINativeMethod methods[] = {
-        {"get", "(Ljava/lang/String;)Ljava/lang/String;", (void*)sem_hook_get_1},
-        {"get", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", (void*)sem_hook_get_2},
-        {"getInt", "(Ljava/lang/String;I)I", (void*)sem_hook_get_int},
-        {"getLong", "(Ljava/lang/String;J)J", (void*)sem_hook_get_long},
-        {"getBoolean", "(Ljava/lang/String;Z)Z", (void*)sem_hook_get_bool},
-        {"native_get", "(Ljava/lang/String;)Ljava/lang/String;", (void*)sem_hook_get_1},
-        {"native_get", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", (void*)sem_hook_get_2},
-    };
-
-    g_api->hookJniNativeMethods(g_env, "android/os/SemSystemProperties", methods, 7);
-    sem_orig_get_1 = (decltype(sem_orig_get_1))methods[0].fnPtr;
-    sem_orig_get_2 = (decltype(sem_orig_get_2))methods[1].fnPtr;
-    sem_orig_get_int = (decltype(sem_orig_get_int))methods[2].fnPtr;
-    sem_orig_get_long = (decltype(sem_orig_get_long))methods[3].fnPtr;
-    sem_orig_get_bool = (decltype(sem_orig_get_bool))methods[4].fnPtr;
-
-    int ok = 0;
-    for (int i = 0; i < 7; ++i) {
-        if (methods[i].fnPtr) ++ok;
-        else LOGW("SemSystemProperties variant unavailable: %s %s", methods[i].name, methods[i].signature);
-    }
-    LOGI("SemSystemProperties hook summary: %d/7 native variants active", ok);
+    LOGI("SemSystemProperties: direct Java wrappers are not hookable via JNI-native API; relying on SystemProperties JNI hooks where delegated");
 }
 
 static void verify_serial_and_country_apis() {
