@@ -41,3 +41,10 @@ serial=UNIVERSAL-SPOOF
 The workflow does not use Ubuntu packages for `aarch64-none-elf`.
 It downloads Arm GNU Toolchain 14.3.rel1 for the GitHub runner and places
 `aarch64-none-elf-*` on PATH before building the KPM.
+
+
+### GitHub Actions SDK fix
+
+The workflow now uses the Android SDK already provisioned on GitHub-hosted Ubuntu runners.
+It calls `sdkmanager` directly and installs only NDK 27.2.12479018; it no longer uses
+`android-actions/setup-android`, which was attempting to install the obsolete `tools` package.
