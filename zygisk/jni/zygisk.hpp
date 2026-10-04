@@ -39,6 +39,7 @@ private:
     template <class T> friend void internal::entry_impl(internal::api_table *, JNIEnv *);
 };
 #define REGISTER_ZYGISK_MODULE(clazz) \
+extern "C" __attribute__((visibility("default"))) \
 void zygisk_module_entry(zygisk::internal::api_table *table, JNIEnv *env) { \
     zygisk::internal::entry_impl<clazz>(table, env); }
 #define REGISTER_ZYGISK_COMPANION(func) void zygisk_companion_entry(int client) { func(client); }
@@ -77,4 +78,7 @@ inline void Api::hookJniNativeMethods(JNIEnv*e,const char*c,JNINativeMethod*m,in
 inline void Api::pltHookRegister(dev_t d,ino_t i,const char*s,void*n,void**o){if(tbl->pltHookRegister)tbl->pltHookRegister(d,i,s,n,o);}
 inline bool Api::pltHookCommit(){return tbl->pltHookCommit!=nullptr&&tbl->pltHookCommit();}
 }
-extern "C" { void zygisk_module_entry(zygisk::internal::api_table *, JNIEnv *); void zygisk_companion_entry(int); }
+extern "C" { \
+__attribute__((visibility("default"))) void zygisk_module_entry(zygisk::internal::api_table *, JNIEnv *); \
+__attribute__((visibility("default"))) void zygisk_companion_entry(int); \
+}
