@@ -34,3 +34,12 @@ The current Native bridge maps supported Build/property fields, hardware serial,
 The KPM build is wired to the bundled `third_party/KPatch-Next-EXP` source tree (version recorded in its `version` file), targeting AArch64. The workflow no longer clones upstream KernelPatch or assumes its older `kernel/arch/arm64` header layout. To override the bundled source for a local build, set `KP_DIR` to another compatible KPatch Next source root.
 
 The current KPM implementation is intentionally a lifecycle/control foundation only. A successful `.kpm` compilation validates the KPM packaging/build interface; it does **not** mean kernel identity hooks are active or that per-app scoping is implemented in kernel space.
+
+
+## Independent per-app UI
+
+A separate Android companion UI now lives in [`ui-android/`](ui-android/). It lists installed apps, edits per-app Native/LSPosed mode and the fields consumed by the current native property/Build layer, and writes the canonical `/data/adb/simspoof.prop` file through `su`. It does not require an app to be added to LSPosed scope for Native mode. Grant root access to the companion app, save a profile, then force-stop and reopen the target app.
+
+Build the UI separately with `cd ui-android && ./gradlew assembleDebug`. The CI workflow also builds and publishes `UniversalSpoofUI-debug.apk` with the source/module artifacts. This UI is a companion APK, not a manager-specific in-app WebUI; it avoids relying on undocumented KPatch Next WebUI APIs.
+
+The UI deliberately does not claim support for hooks that are not implemented in the current Zygisk runtime. Android ID, App Set ID, location, Wi-Fi, procfs, User-Agent and all TelephonyManager Java APIs remain outside the Native hook implementation; see `docs/HOOK_MATRIX.md`.
