@@ -7,5 +7,5 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH) ../../common/include
 LOCAL_CPPFLAGS := -std=c++17 -fvisibility=hidden -fno-exceptions -fno-rtti
 LOCAL_CFLAGS := -O2 -fvisibility=hidden
 LOCAL_LDLIBS := -llog
-LOCAL_LDFLAGS := -Wl,--gc-sections
+LOCAL_LDFLAGS := -Wl,--gc-sections -Wl,--export-dynamic-symbol=zygisk_module_entry -Wl,--export-dynamic-symbol=zygisk_companion_entry
 include $(BUILD_SHARED_LIBRARY)
