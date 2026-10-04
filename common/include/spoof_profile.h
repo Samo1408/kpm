@@ -20,6 +20,8 @@ typedef struct {
     char country_iso[SPOOF_MAX_VALUE];
     char serial[SPOOF_MAX_VALUE];
     char hook_mode[SPOOF_MAX_VALUE];
+    char active[SPOOF_MAX_VALUE];
+    char allowed[SPOOF_MAX_VALUE];
     char scope[SPOOF_MAX_VALUE];
     char fingerprint[SPOOF_MAX_VALUE];
     char build_id[SPOOF_MAX_VALUE];
@@ -41,6 +43,10 @@ typedef struct {
 
 void spoof_profile_init(spoof_profile *p);
 int spoof_profile_load(spoof_profile *p, const char *path);
+/* Loads app.<package>.<key> records from the shared /data/adb/simspoof.prop.
+ * Returns 0 on success, -2 when the file cannot be opened, -3 when no app
+ * record exists for this package. */
+int spoof_profile_load_for_package(spoof_profile *p, const char *path, const char *package_name);
 const char *spoof_profile_get(const spoof_profile *p, const char *key);
 
 #ifdef __cplusplus
