@@ -1,4 +1,4 @@
-name: Build Universal Samsung Spoof - Phase 1-3
+name: Build Universal Samsung Spoof - KPatch Next ARM64
 
 on:
   workflow_dispatch:
@@ -64,58 +64,16 @@ jobs:
           readelf -Ws --dyn-syms libs/arm64-v8a/libuniversal_spoof.so | grep -qE "[[:space:]]GLOBAL[[:space:]]+DEFAULT[[:space:]].*zygisk_module_entry$"
           ! readelf -Ws --dyn-syms libs/arm64-v8a/libuniversal_spoof.so | grep -Eq '[[:space:]]GLOBAL[[:space:]]+DEFAULT[[:space:]].*_Z[0-9]+zygisk_module_entry'
 
-      - name: Clone KernelPatch source
+      - name: Verify bundled KPatch Next source
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf KernelPatch
-          git clone --depth 1 --single-branch --branch main \
-            https://github.com/bmax121/KernelPatch.git KernelPatch
-          test -f KernelPatch/kernel/include/kpmodule.h
-          test -f KernelPatch/kernel/include/compiler.h
-          echo "KernelPatch source ready:"
-          git -C KernelPatch rev-parse HEAD
-          du -sh KernelPatch
-
-      - name: Prepare Universal Samsung Spoof KPM
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf KernelPatch/kpms/universal-samsung-spoof
-          mkdir -p KernelPatch/kpms/universal-samsung-spoof
-          cp kpm/main.c KernelPatch/kpms/universal-samsung-spoof/main.c
-
-          cat > KernelPatch/kpms/universal-samsung-spoof/Makefile <<'EOF'
-          KP_DIR ?= ../..
-          TARGET_COMPILE ?= aarch64-none-elf-
-          CC := $(TARGET_COMPILE)gcc
-          LD := $(TARGET_COMPILE)ld
-          STRIP := $(TARGET_COMPILE)strip
-
-          CFLAGS := -O2 -fno-PIC -fno-asynchronous-unwind-tables -fno-stack-protector -ffreestanding
-          CFLAGS += -I$(KP_DIR)/kernel/include
-          CFLAGS += -I$(KP_DIR)/kernel/patch/include
-          CFLAGS += -I$(KP_DIR)/kernel/patch/include/uapi
-          CFLAGS += -I$(KP_DIR)/kernel/arch/arm64/include
-          CFLAGS += -I$(KP_DIR)/kernel/arch/arm64/include/generated
-          CFLAGS += -I$(KP_DIR)/kernel/include/generated
-
-          LDFLAGS := -r
-
-          all: universal-samsung-spoof.kpm
-
-          universal-samsung-spoof.kpm: main.o
-          	$(LD) $(LDFLAGS) -o $@ $^
-          	$(STRIP) -g $@
-
-          main.o: main.c
-          	$(CC) $(CFLAGS) -c -o $@ $<
-
-          clean:
-          	rm -f *.o *.kpm
-          EOF
-          test -f KernelPatch/kernel/patch/include/uapi/scdefs.h
-          echo "Verified: KernelPatch/kernel/patch/include/uapi/scdefs.h"
+          KP_DIR="$PWD/third_party/KPatch-Next-EXP"
+          test -f "$KP_DIR/kernel/include/kpmodule.h"
+          test -f "$KP_DIR/kernel/include/compiler.h"
+          test -f "$KP_DIR/kernel/include/hook.h"
+          echo "Using bundled KPatch Next source:"
+          cat "$KP_DIR/version"
 
       - name: Build KPM
         shell: bash
@@ -123,11 +81,10 @@ jobs:
           set -euo pipefail
           export TARGET_COMPILE=aarch64-none-elf-
           command -v aarch64-none-elf-gcc
-          cd KernelPatch/kpms/universal-samsung-spoof
-          make clean
-          make
-          test -f universal-samsung-spoof.kpm
-          file universal-samsung-spoof.kpm
+          make -C kpm clean
+          make -C kpm KP_DIR="$PWD/third_party/KPatch-Next-EXP" TARGET_COMPILE="$TARGET_COMPILE"
+          test -f kpm/universal-samsung-spoof.kpm
+          file kpm/universal-samsung-spoof.kpm
 
       - name: Package Zygisk module
         run: |
@@ -146,7 +103,7 @@ jobs:
         run: |
           mkdir -p dist/complete
           cp universal-samsung-spoof-zygisk-alpha2.zip dist/complete/
-          cp KernelPatch/kpms/universal-samsung-spoof/universal-samsung-spoof.kpm dist/complete/
+          cp kpm/universal-samsung-spoof.kpm dist/complete/
           cp docs/HOOK_MATRIX.md dist/complete/
           cd dist/complete
           zip -r ../../universal-samsung-spoof-complete-alpha2.zip .
