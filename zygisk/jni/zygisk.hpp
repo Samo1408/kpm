@@ -28,6 +28,7 @@ enum Option : int {
 namespace internal {
 struct module_abi;
 struct api_table;
+void internal_set_api_table(Api*, api_table*);
 }
 
 struct Api {
