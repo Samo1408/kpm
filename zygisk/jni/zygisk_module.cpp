@@ -17,6 +17,7 @@ static JNIEnv *g_env = nullptr;
 static spoof_profile g_profile;
 static bool g_profile_ok = false;
 static bool g_runtime_initialized = false;
+static bool g_skip_app_runtime = false;
 
 static bool nonempty(const char *s) { return s && *s; }
 
@@ -34,6 +35,17 @@ static std::string spoof_for_property(const char *key) {
     else if (!strcmp(key, "ro.product.board")) v = g_profile.board;
     else if (!strcmp(key, "ro.hardware")) v = g_profile.hardware;
     else if (!strcmp(key, "ro.bootloader")) v = g_profile.bootloader;
+    else if (!strcmp(key, "ro.build.fingerprint")) v = g_profile.fingerprint;
+    else if (!strcmp(key, "ro.build.id")) v = g_profile.build_id;
+    else if (!strcmp(key, "ro.build.display.id")) v = g_profile.build_display;
+    else if (!strcmp(key, "ro.build.version.security_patch")) v = g_profile.security_patch;
+    else if (!strcmp(key, "gsm.version.baseband")) v = g_profile.baseband;
+    else if (!strcmp(key, "ro.soc.model")) v = g_profile.soc_model;
+    else if (!strcmp(key, "ro.soc.manufacturer")) v = g_profile.soc_manufacturer;
+    else if (!strcmp(key, "ro.board.platform")) v = g_profile.board_platform;
+    else if (!strcmp(key, "ro.build.host")) v = g_profile.host;
+    else if (!strcmp(key, "ro.build.user")) v = g_profile.user;
+    else if (!strcmp(key, "ro.build.signature")) v = g_profile.signature;
 
     // Locale / country
     else if (!strcmp(key, "ro.product.locale")) v = g_profile.locale;
@@ -44,6 +56,11 @@ static std::string spoof_for_property(const char *key) {
     // framework-facing layer and are used by several Android/Samsung paths.
     else if (!strcmp(key, "gsm.operator.iso-country")) v = g_profile.country_iso;
     else if (!strcmp(key, "gsm.sim.operator.iso-country")) v = g_profile.country_iso;
+    else if (!strcmp(key, "gsm.operator.numeric")) v = g_profile.network_operator;
+    else if (!strcmp(key, "gsm.operator.alpha")) v = g_profile.network_operator_name;
+    else if (!strcmp(key, "gsm.sim.operator.numeric")) v = g_profile.sim_operator;
+    else if (!strcmp(key, "gsm.sim.operator.alpha")) v = g_profile.sim_operator_name;
+    else if (!strcmp(key, "persist.sys.timezone")) v = g_profile.timezone;
 
     // Serial identity
     else if (!strcmp(key, "ro.serialno")) v = g_profile.serial;
@@ -116,6 +133,15 @@ static void apply_build_fields() {
     set_build_field("BOARD", g_profile.board);
     set_build_field("HARDWARE", g_profile.hardware);
     set_build_field("BOOTLOADER", g_profile.bootloader);
+    set_build_field("FINGERPRINT", g_profile.fingerprint);
+    set_build_field("ID", g_profile.build_id);
+    set_build_field("DISPLAY", g_profile.build_display);
+    jclass version = g_env->FindClass("android/os/Build$VERSION");
+    if (version && nonempty(g_profile.security_patch)) {
+        jfieldID patch = g_env->GetStaticFieldID(version, "SECURITY_PATCH", "Ljava/lang/String;");
+        if (patch) g_env->SetStaticObjectField(version, patch, g_env->NewStringUTF(g_profile.security_patch));
+        if (g_env->ExceptionCheck()) g_env->ExceptionClear();
+    } else if (!version) g_env->ExceptionClear();
     LOGI("Build static fields updated from profile");
 }
 
@@ -274,6 +300,31 @@ static bool load_profile_if_needed() {
     return true;
 }
 
+static bool load_app_profile_for_package(const std::string &package_name) {
+    if (package_name.empty()) return false;
+    const std::string path = "/data/adb/universal-samsung-spoof/profiles/" + package_name + ".prop";
+    spoof_profile candidate;
+    spoof_profile_init(&candidate);
+    if (spoof_profile_load(&candidate, path.c_str()) != 0) return false;
+
+    if (!strcmp(candidate.hook_mode, "lsposed")) {
+        g_skip_app_runtime = true;
+        g_profile_ok = false;
+        LOGI("Per-app mode is LSPosed; skipping Zygisk app hooks for %s", package_name.c_str());
+        return true;
+    }
+    if (strcmp(candidate.hook_mode, "native") != 0) {
+        LOGW("Unknown hook_mode in %s; retaining legacy profile behavior", path.c_str());
+        return false;
+    }
+
+    g_profile = candidate;
+    g_profile_ok = true;
+    g_skip_app_runtime = false;
+    LOGI("Loaded per-app Native profile for %s", package_name.c_str());
+    return true;
+}
+
 static void initialize_spoof_runtime(const char *process_kind) {
     if (g_runtime_initialized) return;
     if (!g_api || !g_env || !load_profile_if_needed()) return;
@@ -293,13 +344,22 @@ public:
         g_env = env;
     }
 
-    void preAppSpecialize(zygisk::AppSpecializeArgs *) override {
-        // Read the profile while still in the zygote specialization flow.
-        // Actual JNI hooks are installed after the app process is specialized.
-        load_profile_if_needed();
+    void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
+        // Explicit per-app mode overrides the legacy global profile for that app.
+        // Profiles are named after the package (the process may include :remote).
+        g_skip_app_runtime = false;
+        g_profile_ok = false;
+        std::string process_name = args && args->nice_name ? jstr(g_env, args->nice_name) : std::string();
+        size_t colon = process_name.find(':');
+        std::string package_name = process_name.substr(0, colon);
+        if (!load_app_profile_for_package(package_name)) {
+            // Backwards compatibility for apps without a mode record.
+            load_profile_if_needed();
+        }
     }
 
     void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
+        if (g_skip_app_runtime) return;
         initialize_spoof_runtime("app_process");
     }
 
