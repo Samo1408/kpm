@@ -35,6 +35,6 @@ On first boot with this module version, `post-fs-data.sh` imports `/system/spoof
 - KPM source declares this same path as the agreed configuration ABI, but its current implementation is only a lifecycle/control stub and has no active kernel spoof hooks or file reader. A true KPM consumer still requires a supported userspace-to-KPM profile relay and actual KPM hook implementation; this source does not claim those kernel hooks are active.
 
 
-## Independent Universal Spoof UI
+## In-module WebUI
 
-`ui-android/` is a standalone companion APK that can manage the shared per-app config without using SimSpoofer's UI. It writes `app.<package>.*` records and maintains `scope=per_app`. A Native record is applied only when `hook_mode=native`, `active=true`, and `allowed=true`; an LSPosed record is an explicit skip/tombstone for Zygisk. The UI preserves other packages and unknown keys. It does not make unsupported hook families functional.
+The module `webroot/` page manages the shared per-app config without a separate APK. It writes `app.<package>.*` records and maintains per-app scope. A Native record is applied only when `hook_mode=native`, `active=true`, and `allowed=true`; an LSPosed record is an explicit skip/tombstone for Zygisk. The UI preserves other package records and unknown keys. It does not make unsupported hook families functional.
