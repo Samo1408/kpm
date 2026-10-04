@@ -2,14 +2,21 @@
 set -euo pipefail
 
 : "${ANDROID_NDK:?Set ANDROID_NDK to an Android NDK installation}"
-: "${KP_DIR:=./KernelPatch}"
+: "${KP_DIR:=./third_party/KPatch-Next-EXP}"
 : "${TARGET_COMPILE:=aarch64-none-elf-}"
+KP_DIR="$(cd "$KP_DIR" && pwd)"
+
+if [[ ! -f "$KP_DIR/kernel/include/kpmodule.h" ]]; then
+  echo "KPatch Next source not found at: $KP_DIR" >&2
+  exit 1
+fi
 
 "$ANDROID_NDK/ndk-build" -C zygisk/jni \
   NDK_PROJECT_PATH="$PWD/zygisk/jni" \
   APP_BUILD_SCRIPT="$PWD/zygisk/jni/Android.mk" \
   NDK_APPLICATION_MK="$PWD/zygisk/jni/Application.mk"
 
+make -C kpm clean
 make -C kpm KP_DIR="$KP_DIR" TARGET_COMPILE="$TARGET_COMPILE"
 
 rm -rf dist universal-samsung-spoof
