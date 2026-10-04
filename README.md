@@ -11,3 +11,6 @@ This source keeps the working KernelPatch KPM and Phase 4 spoof engine, but repl
 - The current spoof hooks remain the same Phase 4 hooks; this change fixes loading first.
 
 The official Zygisk documentation states that modules should inherit `zygisk::ModuleBase` and use `REGISTER_ZYGISK_MODULE`, and that the public API header is the canonical `zygisk.hpp`. citeturn0search1turn3view0
+
+
+Zygisk entrypoint fix: zygisk_module_entry and zygisk_companion_entry are explicitly defined with C linkage and default visibility. CI verifies the dynamic symbol table before packaging.
