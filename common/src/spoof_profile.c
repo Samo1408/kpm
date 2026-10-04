@@ -28,9 +28,9 @@ static char *slot(spoof_profile *p, const char *k) {
     if (!strcmp(k,"locale")) return p->locale;
     if (!strcmp(k,"country")) return p->country;
     if (!strcmp(k,"country_iso")) return p->country_iso;
-    if (!strcmp(k,"country_iso_lower")) return p->country_iso_lower;
     if (!strcmp(k,"serial")) return p->serial;
     if (!strcmp(k,"hook_mode")) return p->hook_mode;
+    if (!strcmp(k,"scope")) return p->scope;
     if (!strcmp(k,"timezone")) return p->timezone;
     if (!strcmp(k,"sim_operator_name")) return p->sim_operator_name;
     if (!strcmp(k,"sim_operator")) return p->sim_operator;
@@ -88,9 +88,9 @@ const char *spoof_profile_get(const spoof_profile *p, const char *key) {
     if (!strcmp(key,"locale")) return p->locale;
     if (!strcmp(key,"country")) return p->country;
     if (!strcmp(key,"country_iso")) return p->country_iso;
-    if (!strcmp(key,"country_iso_lower")) return p->country_iso_lower;
     if (!strcmp(key,"serial")) return p->serial;
     if (!strcmp(key,"hook_mode")) return p->hook_mode;
+    if (!strcmp(key,"scope")) return p->scope;
     if (!strcmp(key,"timezone")) return p->timezone;
     if (!strcmp(key,"sim_operator_name")) return p->sim_operator_name;
     if (!strcmp(key,"sim_operator")) return p->sim_operator;
