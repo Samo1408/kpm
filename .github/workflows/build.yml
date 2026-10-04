@@ -59,6 +59,9 @@ jobs:
           cd zygisk/jni
           "$ANDROID_NDK/ndk-build"             NDK_PROJECT_PATH="$PWD"             APP_BUILD_SCRIPT="$PWD/Android.mk"             NDK_APPLICATION_MK="$PWD/Application.mk"
           test -f libs/arm64-v8a/libuniversal_spoof.so
+          echo "=== Zygisk exported symbols ==="
+          readelf -Ws libs/arm64-v8a/libuniversal_spoof.so | grep -E "[[:space:]]zygisk_module_entry$|[[:space:]]zygisk_companion_entry$"
+          readelf -Ws libs/arm64-v8a/libuniversal_spoof.so | grep -qE "[[:space:]]GLOBAL[[:space:]]+DEFAULT[[:space:]].*zygisk_module_entry$"
 
       - name: Clone KernelPatch source
         shell: bash
@@ -154,4 +157,4 @@ jobs:
           path: |
             universal-samsung-spoof-zygisk-alpha2.zip
             universal-samsung-spoof-complete-alpha2.zip
-            kpm/universal-samsung-spoof.kpm
+            dist/complete/universal-samsung-spoof.kpm
