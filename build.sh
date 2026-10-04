@@ -20,21 +20,19 @@ make -C kpm clean
 make -C kpm KP_DIR="$KP_DIR" TARGET_COMPILE="$TARGET_COMPILE"
 
 rm -rf dist universal-samsung-spoof
-mkdir -p dist/universal-samsung-spoof/zygisk
+mkdir -p dist/universal-samsung-spoof/zygisk dist/universal-samsung-spoof/webroot
 cp packaging/module.prop dist/universal-samsung-spoof/module.prop
 cp packaging/profile.prop dist/universal-samsung-spoof/profile.prop
 cp packaging/post-fs-data.sh dist/universal-samsung-spoof/post-fs-data.sh
 cp packaging/service.sh dist/universal-samsung-spoof/service.sh
+cp webroot/index.html webroot/app.js webroot/style.css dist/universal-samsung-spoof/webroot/
 cp zygisk/jni/libs/arm64-v8a/libuniversal_spoof.so dist/universal-samsung-spoof/zygisk/arm64-v8a.so
 chmod 0755 dist/universal-samsung-spoof/*.sh
 
 cd dist
-zip -r ../universal-samsung-spoof-zygisk-alpha2.zip universal-samsung-spoof >/dev/null
+zip -r ../universal-samsung-spoof-zygisk-webui.zip universal-samsung-spoof >/dev/null
 cp ../kpm/universal-samsung-spoof.kpm .
 cp ../docs/HOOK_MATRIX.md .
-if [[ -f ../universal-spoof-ui-debug.apk ]]; then
-  cp ../universal-spoof-ui-debug.apk UniversalSpoofUI-debug.apk
-fi
-zip -r ../universal-samsung-spoof-complete-alpha2.zip . >/dev/null
+zip -r ../universal-samsung-spoof-complete-webui.zip . >/dev/null
 
 echo "Build complete."
