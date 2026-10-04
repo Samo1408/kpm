@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark light"><title>Universal Samsung Spoof</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="brand"><span class="mark">US</span><div><h1>Universal Samsung Spoof</h1><p>Zygisk · Per-app profiles</p></div></div><span id="manager" class="pill">Checking manager…</span></header>
+<main>
+<section class="notice"><b>Scope & limits</b><p>Profiles are saved per package in <code>/data/adb/simspoof.prop</code>. Zygisk applies supported properties and Build fields inside the selected app process. Saving does not retroactively change an already-running process; force-stop and reopen the target app.</p></section>
+<section class="panel"><div class="section-head"><h2>1. Target app</h2><button id="refresh" class="secondary">Refresh app list</button></div><label for="appSearch">Search installed apps</label><input id="appSearch" placeholder="Package name or app label" autocomplete="off"><label for="package">Installed package</label><select id="package"><option value="">Load installed apps…</option></select><div class="inline"><input id="manualPackage" placeholder="or enter package.name manually"><button id="useManual" class="secondary">Use package</button></div><small>App labels may not be available from the manager shell; package IDs are authoritative.</small></section>
+<section class="panel"><div class="section-head"><h2>2. Profile</h2><span id="profileState" class="pill muted">No package selected</span></div>
+<div class="toggles"><label class="check"><input type="checkbox" id="active"> Active</label><label class="check"><input type="checkbox" id="allowed"> Allowed in profile list</label><label class="check"><input type="checkbox" id="native" checked> Use Zygisk Native hooks</label></div>
+<div class="grid">
+<label>Model<input id="model" placeholder="SM-S928B"></label><label>Brand<input id="brand" placeholder="samsung"></label><label>Device<input id="device" placeholder="e3q"></label><label>Product<input id="product" placeholder="e3qxxx"></label><label>Manufacturer<input id="manufacturer" placeholder="samsung"></label><label>Board<input id="board" placeholder="board name"></label><label>Hardware<input id="hardware" placeholder="qcom"></label><label>Bootloader<input id="bootloader" placeholder="build tag"></label><label>Fingerprint<input id="fingerprint" placeholder="brand/device/build:fingerprint"></label><label>Build ID<input id="build_id" placeholder="UP1A…"></label><label>Display ID<input id="build_display" placeholder="release display"></label><label>Security patch<input id="security_patch" placeholder="2026-09-01"></label><label>Locale<input id="locale" placeholder="en-US"></label><label>Country ISO<input id="country_iso" maxlength="2" placeholder="US"></label><label>Timezone<input id="timezone" placeholder="America/New_York"></label><label>Serial property<input id="serial" placeholder="optional"></label><label>SoC model<input id="soc_model" placeholder="optional"></label><label>SoC manufacturer<input id="soc_manufacturer" placeholder="optional"></label><label>Baseband<input id="baseband" placeholder="optional"></label><label>Network operator numeric<input id="network_operator" placeholder="310260"></label><label>Network operator name<input id="network_operator_name" placeholder="operator"></label><label>SIM operator numeric<input id="sim_operator" placeholder="310260"></label><label>SIM operator name<input id="sim_operator_name" placeholder="operator"></label></div>
+<div class="actions"><button id="load" class="secondary">Load saved profile</button><button id="save">Save profile</button><button id="disable" class="danger">Disable this profile</button></div>
+</section>
+<section class="panel"><div class="section-head"><h2>3. Runtime diagnostics</h2><button id="diagnose" class="secondary">Run checks</button></div><pre id="output" aria-live="polite">Ready. Choose a package and load its profile.</pre><p class="hint">The current native engine does not implement every Java-level API (for example Android ID, App Set ID, location, and all TelephonyManager methods). system_server alone cannot rewrite values read directly inside another app process.</p></section>
+</main><footer>Configuration is opt-in per app. This UI does not enable a profile until you select Active and Allowed and save.</footer>
+<script src="app.js"></script>
+</body></html>
