@@ -5,7 +5,6 @@
 #include <jni.h>
 #include <cstdlib>
 #include <cstring>
-#include <cctype>
 #include <string>
 
 #define TAG "UniversalSamsungSpoof"
@@ -21,17 +20,6 @@ static bool g_runtime_initialized = false;
 static bool g_skip_app_runtime = false;
 
 static bool nonempty(const char *s) { return s && *s; }
-
-// Android Telephony country ISO properties are conventionally lower-case,
-// while ro.product.locale.region is an upper-case region subtag. Keep these
-// representations separate so one does not leak into the other.
-static std::string telephony_country_iso() {
-    const char *src = nonempty(g_profile.country_iso_lower)
-        ? g_profile.country_iso_lower : g_profile.country_iso;
-    std::string out = src ? src : "";
-    for (char &ch : out) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-    return out;
-}
 
 static std::string spoof_for_property(const char *key) {
     if (!key) return {};
@@ -66,14 +54,8 @@ static std::string spoof_for_property(const char *key) {
 
     // Telephony country / operator properties. These are the lowest-risk
     // framework-facing layer and are used by several Android/Samsung paths.
-    else if (!strcmp(key, "gsm.operator.iso-country")) {
-        std::string iso = telephony_country_iso();
-        return iso;
-    }
-    else if (!strcmp(key, "gsm.sim.operator.iso-country")) {
-        std::string iso = telephony_country_iso();
-        return iso;
-    }
+    else if (!strcmp(key, "gsm.operator.iso-country")) v = g_profile.country_iso;
+    else if (!strcmp(key, "gsm.sim.operator.iso-country")) v = g_profile.country_iso;
     else if (!strcmp(key, "gsm.operator.numeric")) v = g_profile.network_operator;
     else if (!strcmp(key, "gsm.operator.alpha")) v = g_profile.network_operator_name;
     else if (!strcmp(key, "gsm.sim.operator.numeric")) v = g_profile.sim_operator;
@@ -196,15 +178,70 @@ static void install_system_property_hooks() {
 }
 
 
-// SemSystemProperties.get* methods are Java wrappers on many Samsung builds,
-// not JNI-native methods. Zygisk's hookJniNativeMethods API cannot replace
-// ordinary ART Java methods, so probing them as native variants always yields
-// 0/N on those builds and gives a misleading impression of missing native hooks.
-// These wrappers commonly delegate to android.os.SystemProperties, whose JNI
-// methods are hooked above. We log this limitation explicitly rather than
-// attempting unsafe ART entry-point patching that varies by Android release.
+// Samsung's SemSystemProperties has changed implementation details between
+// One UI / Android releases. We therefore probe several native signatures.
+// hookJniNativeMethods() leaves fnPtr == nullptr when a method is not native
+// or does not exist, so unsupported variants are harmless.
+static jstring (*sem_orig_get_1)(JNIEnv*, jclass, jstring) = nullptr;
+static jstring (*sem_orig_get_2)(JNIEnv*, jclass, jstring, jstring) = nullptr;
+static jint (*sem_orig_get_int)(JNIEnv*, jclass, jstring, jint) = nullptr;
+static jlong (*sem_orig_get_long)(JNIEnv*, jclass, jstring, jlong) = nullptr;
+static jboolean (*sem_orig_get_bool)(JNIEnv*, jclass, jstring, jboolean) = nullptr;
+
+static jstring sem_hook_get_1(JNIEnv *env, jclass c, jstring key) {
+    std::string k = jstr(env, key);
+    std::string v = spoof_for_property(k.c_str());
+    if (!v.empty()) {
+        LOGI("SemSystemProperties.get spoof: %s=%s", k.c_str(), v.c_str());
+        return env->NewStringUTF(v.c_str());
+    }
+    return sem_orig_get_1 ? sem_orig_get_1(env, c, key) : nullptr;
+}
+
+static jstring sem_hook_get_2(JNIEnv *env, jclass c, jstring key, jstring def) {
+    std::string k = jstr(env, key);
+    std::string v = spoof_for_property(k.c_str());
+    if (!v.empty()) {
+        LOGI("SemSystemProperties.get(def) spoof: %s=%s", k.c_str(), v.c_str());
+        return env->NewStringUTF(v.c_str());
+    }
+    return sem_orig_get_2 ? sem_orig_get_2(env, c, key, def) : def;
+}
+
+static jint sem_hook_get_int(JNIEnv *env, jclass c, jstring key, jint def) {
+    return sem_orig_get_int ? sem_orig_get_int(env, c, key, def) : def;
+}
+static jlong sem_hook_get_long(JNIEnv *env, jclass c, jstring key, jlong def) {
+    return sem_orig_get_long ? sem_orig_get_long(env, c, key, def) : def;
+}
+static jboolean sem_hook_get_bool(JNIEnv *env, jclass c, jstring key, jboolean def) {
+    return sem_orig_get_bool ? sem_orig_get_bool(env, c, key, def) : def;
+}
+
 static void install_sem_system_properties_hooks() {
-    LOGI("SemSystemProperties: direct Java wrappers are not hookable via JNI-native API; relying on SystemProperties JNI hooks where delegated");
+    JNINativeMethod methods[] = {
+        {"get", "(Ljava/lang/String;)Ljava/lang/String;", (void*)sem_hook_get_1},
+        {"get", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", (void*)sem_hook_get_2},
+        {"getInt", "(Ljava/lang/String;I)I", (void*)sem_hook_get_int},
+        {"getLong", "(Ljava/lang/String;J)J", (void*)sem_hook_get_long},
+        {"getBoolean", "(Ljava/lang/String;Z)Z", (void*)sem_hook_get_bool},
+        {"native_get", "(Ljava/lang/String;)Ljava/lang/String;", (void*)sem_hook_get_1},
+        {"native_get", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", (void*)sem_hook_get_2},
+    };
+
+    g_api->hookJniNativeMethods(g_env, "android/os/SemSystemProperties", methods, 7);
+    sem_orig_get_1 = (decltype(sem_orig_get_1))methods[0].fnPtr;
+    sem_orig_get_2 = (decltype(sem_orig_get_2))methods[1].fnPtr;
+    sem_orig_get_int = (decltype(sem_orig_get_int))methods[2].fnPtr;
+    sem_orig_get_long = (decltype(sem_orig_get_long))methods[3].fnPtr;
+    sem_orig_get_bool = (decltype(sem_orig_get_bool))methods[4].fnPtr;
+
+    int ok = 0;
+    for (int i = 0; i < 7; ++i) {
+        if (methods[i].fnPtr) ++ok;
+        else LOGW("SemSystemProperties variant unavailable: %s %s", methods[i].name, methods[i].signature);
+    }
+    LOGI("SemSystemProperties hook summary: %d/7 native variants active", ok);
 }
 
 static void verify_serial_and_country_apis() {
@@ -238,29 +275,39 @@ static void verify_serial_and_country_apis() {
 static bool load_profile_if_needed() {
     if (g_profile_ok) return true;
 
-    spoof_profile_init(&g_profile);
     const char *paths[] = {
         "/data/adb/universal-samsung-spoof/profile.prop",
         "/data/adb/modules/universal-samsung-spoof/profile.prop",
         "/data/local/tmp/universal-samsung-spoof/profile.prop"
     };
 
-    for (const char *p : paths) {
-        if (spoof_profile_load(&g_profile, p) == 0) {
-            g_profile_ok = true;
-            LOGI("Loaded profile: %s", p);
-            break;
+    for (const char *path : paths) {
+        spoof_profile candidate;
+        spoof_profile_init(&candidate);
+        if (spoof_profile_load(&candidate, path) != 0) continue;
+
+        // Preserve the legacy global behavior when scope is absent. Users can
+        // explicitly restrict the global profile with scope=per_app; unknown
+        // scope values fail closed instead of being interpreted as global.
+        if (strcmp(candidate.scope, "per_app") == 0) {
+            LOGI("Global profile disabled by scope=per_app: %s", path);
+            continue;
         }
+        if (candidate.scope[0] != '\0' && strcmp(candidate.scope, "global") != 0) {
+            LOGW("Unknown global profile scope; ignoring profile: %s", path);
+            continue;
+        }
+
+        g_profile = candidate;
+        g_profile_ok = true;
+        LOGI("Loaded global profile: %s", path);
+        LOGI("Profile ready: model=%s country=%s locale=%s",
+             g_profile.model, g_profile.country_iso, g_profile.locale);
+        return true;
     }
 
-    if (!g_profile_ok) {
-        LOGW("No profile loaded; original values will be preserved");
-        return false;
-    }
-
-    LOGI("Profile ready: model=%s country=%s locale=%s",
-         g_profile.model, g_profile.country_iso, g_profile.locale);
-    return true;
+    LOGI("No usable global profile; only explicit per-app Native profiles can run");
+    return false;
 }
 
 static bool load_app_profile_for_package(const std::string &package_name) {
@@ -277,8 +324,12 @@ static bool load_app_profile_for_package(const std::string &package_name) {
         return true;
     }
     if (strcmp(candidate.hook_mode, "native") != 0) {
-        LOGW("Unknown hook_mode in %s; retaining legacy profile behavior", path.c_str());
-        return false;
+        // A present but invalid per-app record must not fall through to the
+        // global profile; fail closed to avoid spoofing an unintended app.
+        g_skip_app_runtime = true;
+        g_profile_ok = false;
+        LOGW("Unknown hook_mode in %s; skipping Zygisk app runtime", path.c_str());
+        return true;
     }
 
     g_profile = candidate;
@@ -316,7 +367,8 @@ public:
         size_t colon = process_name.find(':');
         std::string package_name = process_name.substr(0, colon);
         if (!load_app_profile_for_package(package_name)) {
-            // Backwards compatibility for apps without a mode record.
+            // Apps without a per-app record retain the legacy global behavior
+            // unless the global profile explicitly uses scope=per_app.
             load_profile_if_needed();
         }
     }
