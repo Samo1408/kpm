@@ -1,0 +1,80 @@
+name: Build Universal Samsung Spoof
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip zip make gcc-aarch64-none-elf binutils-aarch64-none-elf
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;27.2.12479018"
+
+      - name: Build Zygisk ARM64
+        env:
+          ANDROID_NDK: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+        run: |
+          cd zygisk/jni
+          "$ANDROID_NDK/ndk-build" NDK_PROJECT_PATH="$PWD" APP_BUILD_SCRIPT="$PWD/Android.mk" NDK_APPLICATION_MK="$PWD/Application.mk"
+          test -f libs/arm64-v8a/libuniversal_spoof.so
+
+      - name: Checkout KernelPatch
+        uses: actions/checkout@v4
+        with:
+          repository: senran-N/KernelPatch
+          path: KernelPatch
+
+      - name: Build KPM
+        run: |
+          export TARGET_COMPILE=aarch64-none-elf-
+          make -C kpm KP_DIR="$GITHUB_WORKSPACE/KernelPatch"
+          test -f kpm/universal-samsung-spoof.kpm
+
+      - name: Package Zygisk module
+        run: |
+          rm -rf dist universal-samsung-spoof
+          mkdir -p dist/universal-samsung-spoof/zygisk
+          cp packaging/module.prop dist/universal-samsung-spoof/module.prop
+          cp packaging/profile.prop dist/universal-samsung-spoof/profile.prop
+          cp packaging/post-fs-data.sh dist/universal-samsung-spoof/post-fs-data.sh
+          cp packaging/service.sh dist/universal-samsung-spoof/service.sh
+          cp zygisk/jni/libs/arm64-v8a/libuniversal_spoof.so dist/universal-samsung-spoof/zygisk/arm64-v8a.so
+          chmod 0755 dist/universal-samsung-spoof/*.sh
+          cd dist
+          zip -r ../universal-samsung-spoof-zygisk-alpha2.zip universal-samsung-spoof
+
+      - name: Package complete artifact
+        run: |
+          mkdir -p dist/complete
+          cp universal-samsung-spoof-zygisk-alpha2.zip dist/complete/
+          cp kpm/universal-samsung-spoof.kpm dist/complete/
+          cp docs/HOOK_MATRIX.md dist/complete/
+          cd dist/complete
+          zip -r ../../universal-samsung-spoof-complete-alpha2.zip .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-samsung-spoof-alpha2
+          path: |
+            universal-samsung-spoof-zygisk-alpha2.zip
+            universal-samsung-spoof-complete-alpha2.zip
+            kpm/universal-samsung-spoof.kpm
