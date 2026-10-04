@@ -29,3 +29,11 @@ SimSpoofer can export a per-package mode record to:
 - `kpm/main.c` remains a lifecycle/control foundation; it does not yet implement KPM hooks. Do not interpret the Native selector as proof that KPM spoof hooks are active.
 
 Native mode export requires root access from the SimSpoofer UI and an installed module at `/data/adb/modules/universal-samsung-spoof`. If export fails, the app displays a warning and the saved LSPosed preferences remain intact.
+
+
+## Country ISO consistency fix
+
+- `country_iso` is kept upper-case for the locale region property.
+- `country_iso_lower` is exported for Android telephony ISO properties, which are conventionally lower-case. Older profiles without `country_iso_lower` remain supported through a lower-case fallback.
+- `SemSystemProperties.get*` is not reported as a direct active native hook: on builds where it is a Java wrapper, Zygisk's JNI-native hook API cannot replace it. The module hooks `SystemProperties` JNI entry points and logs this limitation clearly.
+- KPM remains lifecycle/control foundation only; this change does not claim kernel hooks are implemented.
