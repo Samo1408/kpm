@@ -36,10 +36,10 @@ The KPM build is wired to the bundled `third_party/KPatch-Next-EXP` source tree 
 The current KPM implementation is intentionally a lifecycle/control foundation only. A successful `.kpm` compilation validates the KPM packaging/build interface; it does **not** mean kernel identity hooks are active or that per-app scoping is implemented in kernel space.
 
 
-## Independent per-app UI
+## In-module WebUI (KernelSU-compatible)
 
-A separate Android companion UI now lives in [`ui-android/`](ui-android/). It lists installed apps, edits per-app Native/LSPosed mode and the fields consumed by the current native property/Build layer, and writes the canonical `/data/adb/simspoof.prop` file through `su`. It does not require an app to be added to LSPosed scope for Native mode. Grant root access to the companion app, save a profile, then force-stop and reopen the target app.
+The module now packages its management page in [`webroot/`](webroot/), rather than building a separate Android companion APK as the primary UI. From a manager that exposes the KernelSU-style `ksu.exec` root-shell bridge, the WebUI lists package IDs, edits per-app profiles, saves them atomically to `/data/adb/simspoof.prop`, and shows basic runtime diagnostics. The UI does not enable a profile unless the user explicitly checks both **Active** and **Allowed**. It keeps the native/LSPosed mode selector per package.
 
-Build the UI separately with `cd ui-android && ./gradlew assembleDebug`. The CI workflow also builds and publishes `UniversalSpoofUI-debug.apk` with the source/module artifacts. This UI is a companion APK, not a manager-specific in-app WebUI; it avoids relying on undocumented KPatch Next WebUI APIs.
+The standalone companion-APK source and its CI build target have been removed from this project direction. The packaged WebUI currently requires a manager WebView that exposes `ksu.exec(command, callback)` (or a compatible `exec` API); it is not a universal WebUI API shared by every root manager.
 
-The UI deliberately does not claim support for hooks that are not implemented in the current Zygisk runtime. Android ID, App Set ID, location, Wi-Fi, procfs, User-Agent and all TelephonyManager Java APIs remain outside the Native hook implementation; see `docs/HOOK_MATRIX.md`.
+**Hook execution and limits:** the UI configures the existing Zygisk engine; it does not add new hooks by itself. The current native runtime applies supported Build fields and property values in the selected app process. `system_server` alone cannot change every value read directly in an app process, so per-app behavior remains implemented by Zygisk specialization. Android ID, App Set ID, location, Wi-Fi, procfs, User-Agent and all TelephonyManager Java APIs remain outside the current Native hook implementation; see `docs/HOOK_MATRIX.md`. KPM is still a lifecycle/control stub, not an active spoof engine.
