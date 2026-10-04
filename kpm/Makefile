@@ -13,6 +13,10 @@ INCLUDE_FLAGS := $(foreach dir,$(INCLUDE_DIRS),-I$(KP_DIR)/kernel/$(dir))
 
 all: universal-samsung-spoof.kpm
 
+check-kp:
+	@test -f $(KP_DIR)/kernel/include/kpmodule.h
+	@test -f $(KP_DIR)/kernel/include/compiler.h
+
 universal-samsung-spoof.kpm: main.o
 	$(CC) $(CFLAGS) $(INCLUDE_FLAGS) -r -o $@ $^
 	$(STRIP) -g $@
