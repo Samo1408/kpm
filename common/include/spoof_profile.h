@@ -19,6 +19,23 @@ typedef struct {
     char country[SPOOF_MAX_VALUE];
     char country_iso[SPOOF_MAX_VALUE];
     char serial[SPOOF_MAX_VALUE];
+    char hook_mode[SPOOF_MAX_VALUE];
+    char fingerprint[SPOOF_MAX_VALUE];
+    char build_id[SPOOF_MAX_VALUE];
+    char build_display[SPOOF_MAX_VALUE];
+    char security_patch[SPOOF_MAX_VALUE];
+    char baseband[SPOOF_MAX_VALUE];
+    char soc_model[SPOOF_MAX_VALUE];
+    char soc_manufacturer[SPOOF_MAX_VALUE];
+    char board_platform[SPOOF_MAX_VALUE];
+    char host[SPOOF_MAX_VALUE];
+    char user[SPOOF_MAX_VALUE];
+    char signature[SPOOF_MAX_VALUE];
+    char network_operator[SPOOF_MAX_VALUE];
+    char network_operator_name[SPOOF_MAX_VALUE];
+    char sim_operator[SPOOF_MAX_VALUE];
+    char sim_operator_name[SPOOF_MAX_VALUE];
+    char timezone[SPOOF_MAX_VALUE];
 } spoof_profile;
 
 void spoof_profile_init(spoof_profile *p);
