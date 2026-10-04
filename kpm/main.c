@@ -1,6 +1,5 @@
 #include <compiler.h>
 #include <kpmodule.h>
-#include <linux/printk.h>
 
 KPM_NAME("universal-samsung-spoof");
 KPM_VERSION("0.1.0");
@@ -10,9 +9,9 @@ KPM_DESCRIPTION("Universal Samsung spoof KPM foundation");
 
 static long uss_init(const char *args, const char *event, void *reserved)
 {
-    pr_info("universal-samsung-spoof: init event=%s args=%s\n",
-            event ? event : "(null)",
-            args ? args : "(null)");
+    (void)args;
+    (void)event;
+    (void)reserved;
     return 0;
 }
 
@@ -26,7 +25,7 @@ static long uss_control0(const char *args, char *__user out_msg, int outlen)
 
 static long uss_exit(void *reserved)
 {
-    pr_info("universal-samsung-spoof: exit\n");
+    (void)reserved;
     return 0;
 }
 
