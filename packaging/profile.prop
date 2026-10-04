@@ -11,4 +11,5 @@ bootloader=S928BXXU
 locale=en-US
 country=United States
 country_iso=US
+country_iso_lower=us
 serial=UNIVERSAL-SPOOF
