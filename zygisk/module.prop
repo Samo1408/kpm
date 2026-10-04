@@ -1,0 +1,6 @@
+id=universal-samsung-spoof
+name=Universal Samsung Spoof
+version=0.4.0-shared-config
+versionCode=4
+author=Universal-Samsung-Spoof
+description=Native system_server spoof engine for Samsung Android 14 without framework.jar modification.
