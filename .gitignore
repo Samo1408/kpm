@@ -1,0 +1,7 @@
+zygisk/jni/obj/
+zygisk/jni/libs/
+kpm/*.o
+kpm/*.kpm
+KernelPatch/
+dist/
+*.zip
