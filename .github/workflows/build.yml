@@ -64,6 +64,19 @@ jobs:
           readelf -Ws --dyn-syms libs/arm64-v8a/libuniversal_spoof.so | grep -qE "[[:space:]]GLOBAL[[:space:]]+DEFAULT[[:space:]].*zygisk_module_entry$"
           ! readelf -Ws --dyn-syms libs/arm64-v8a/libuniversal_spoof.so | grep -Eq '[[:space:]]GLOBAL[[:space:]]+DEFAULT[[:space:]].*_Z[0-9]+zygisk_module_entry'
 
+      - name: Build independent Universal Spoof UI APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"; fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+          cd ui-android
+          ./gradlew --no-daemon assembleDebug
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../universal-spoof-ui-debug.apk
+
       - name: Verify bundled KPatch Next source
         shell: bash
         run: |
@@ -105,6 +118,7 @@ jobs:
           cp universal-samsung-spoof-zygisk-alpha2.zip dist/complete/
           cp kpm/universal-samsung-spoof.kpm dist/complete/
           cp docs/HOOK_MATRIX.md dist/complete/
+          cp universal-spoof-ui-debug.apk dist/complete/UniversalSpoofUI-debug.apk
           cd dist/complete
           zip -r ../../universal-samsung-spoof-complete-alpha2.zip .
 
@@ -116,3 +130,4 @@ jobs:
             universal-samsung-spoof-zygisk-alpha2.zip
             universal-samsung-spoof-complete-alpha2.zip
             dist/complete/universal-samsung-spoof.kpm
+            universal-spoof-ui-debug.apk
