@@ -18,9 +18,9 @@ typedef struct {
     char locale[SPOOF_MAX_VALUE];
     char country[SPOOF_MAX_VALUE];
     char country_iso[SPOOF_MAX_VALUE];
-    char country_iso_lower[SPOOF_MAX_VALUE];
     char serial[SPOOF_MAX_VALUE];
     char hook_mode[SPOOF_MAX_VALUE];
+    char scope[SPOOF_MAX_VALUE];
     char fingerprint[SPOOF_MAX_VALUE];
     char build_id[SPOOF_MAX_VALUE];
     char build_display[SPOOF_MAX_VALUE];
