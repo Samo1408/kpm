@@ -20,3 +20,17 @@ Runtime initialization now runs in `system_server` and app processes. This does 
 | Telephony | `getNetworkCountryIso()` | runtime presence check | detected | property layer |
 | Telephony | `getNetworkCountryIso(int)` | runtime presence check | detected | property layer |
 | Telephony | `getSimCountryIso()` | runtime presence check | detected | property layer |
+
+
+## SimSpoofer integration status
+
+| SimSpoofer field group | Native bridge status | Notes |
+|---|---|---|
+| Device model / brand / product / board / hardware / bootloader | Profile export supported | Applied only when the device-model feature is enabled and values are present |
+| Hardware serial | Profile export supported | Property-layer mapping only; Java `Build.getSerial()` is not ART-patched |
+| Country ISO | Profile export supported | Property-layer mapping; Samsung CSC/Wi-Fi and Telephony Java APIs can still report a different country |
+| SIM/operator Java APIs | Not ported to Native | Existing LSPosed hooks remain available |
+| Android ID, GSF ID, App Set ID, Widevine, location, User-Agent, procfs | Not ported to Native | Requires dedicated per-API native/runtime implementations; not implied by the mode switch |
+| KPM | Lifecycle foundation only | No kernel hooks are implemented in `kpm/main.c` |
+| SIM/network operator numeric + name | Property-layer export supported | Maps `gsm.operator.*` and `gsm.sim.operator.*` properties; does not replace every `TelephonyManager` API |
+| Time zone | Property-layer export supported | Maps `persist.sys.timezone`; Java/system time-zone services may cache their own value |
