@@ -60,19 +60,34 @@ jobs:
           "$ANDROID_NDK/ndk-build"             NDK_PROJECT_PATH="$PWD"             APP_BUILD_SCRIPT="$PWD/Android.mk"             NDK_APPLICATION_MK="$PWD/Application.mk"
           test -f libs/arm64-v8a/libuniversal_spoof.so
 
-      - name: Checkout KernelPatch
-        uses: actions/checkout@v4
-        with:
-          repository: senran-N/KernelPatch
-          path: KernelPatch
+      - name: Download KernelPatch source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf KernelPatch KernelPatch-src KernelPatch.tar.gz
+          curl -L --fail --retry 5 --retry-all-errors \
+            "https://github.com/senran-N/KernelPatch/archive/refs/heads/main.tar.gz" \
+            -o KernelPatch.tar.gz
+          mkdir -p KernelPatch-src
+          tar -xzf KernelPatch.tar.gz -C KernelPatch-src --strip-components=1
+          mv KernelPatch-src KernelPatch
+          test -f KernelPatch/kernel/include/kpmodule.h
+          test -f KernelPatch/kernel/include/compiler.h
+          echo "KernelPatch source ready:"
+          git --version || true
+          du -sh KernelPatch
 
       - name: Build KPM
+        shell: bash
         run: |
+          set -euo pipefail
           export TARGET_COMPILE=aarch64-none-elf-
           command -v aarch64-none-elf-gcc
+          test -f "$GITHUB_WORKSPACE/KernelPatch/kernel/include/kpmodule.h"
           make -C kpm clean
           make -C kpm KP_DIR="$GITHUB_WORKSPACE/KernelPatch" TARGET_COMPILE="$TARGET_COMPILE"
           test -f kpm/universal-samsung-spoof.kpm
+          file kpm/universal-samsung-spoof.kpm || true
 
       - name: Package Zygisk module
         run: |
