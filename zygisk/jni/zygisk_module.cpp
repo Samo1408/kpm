@@ -16,6 +16,7 @@ static zygisk::Api *g_api = nullptr;
 static JNIEnv *g_env = nullptr;
 static spoof_profile g_profile;
 static bool g_profile_ok = false;
+static bool g_runtime_initialized = false;
 
 static bool nonempty(const char *s) { return s && *s; }
 
@@ -245,6 +246,46 @@ static void verify_serial_and_country_apis() {
     } else g_env->ExceptionClear();
 }
 
+static bool load_profile_if_needed() {
+    if (g_profile_ok) return true;
+
+    spoof_profile_init(&g_profile);
+    const char *paths[] = {
+        "/data/adb/universal-samsung-spoof/profile.prop",
+        "/data/adb/modules/universal-samsung-spoof/profile.prop",
+        "/data/local/tmp/universal-samsung-spoof/profile.prop"
+    };
+
+    for (const char *p : paths) {
+        if (spoof_profile_load(&g_profile, p) == 0) {
+            g_profile_ok = true;
+            LOGI("Loaded profile: %s", p);
+            break;
+        }
+    }
+
+    if (!g_profile_ok) {
+        LOGW("No profile loaded; original values will be preserved");
+        return false;
+    }
+
+    LOGI("Profile ready: model=%s country=%s locale=%s",
+         g_profile.model, g_profile.country_iso, g_profile.locale);
+    return true;
+}
+
+static void initialize_spoof_runtime(const char *process_kind) {
+    if (g_runtime_initialized) return;
+    if (!g_api || !g_env || !load_profile_if_needed()) return;
+
+    install_system_property_hooks();
+    install_sem_system_properties_hooks();
+    apply_build_fields();
+    verify_serial_and_country_apis();
+    g_runtime_initialized = true;
+    LOGI("Spoof runtime initialized in %s", process_kind);
+}
+
 class UniversalSamsungSpoof : public zygisk::ModuleBase {
 public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
@@ -252,38 +293,22 @@ public:
         g_env = env;
     }
 
+    void preAppSpecialize(zygisk::AppSpecializeArgs *) override {
+        // Read the profile while still in the zygote specialization flow.
+        // Actual JNI hooks are installed after the app process is specialized.
+        load_profile_if_needed();
+    }
+
+    void postAppSpecialize(const zygisk::AppSpecializeArgs *) override {
+        initialize_spoof_runtime("app_process");
+    }
+
     void preServerSpecialize(zygisk::ServerSpecializeArgs *) override {
-        spoof_profile_init(&g_profile);
-
-        const char *paths[] = {
-            "/data/adb/universal-samsung-spoof/profile.prop",
-            "/data/adb/modules/universal-samsung-spoof/profile.prop",
-            "/data/local/tmp/universal-samsung-spoof/profile.prop"
-        };
-
-        for (const char *p : paths) {
-            if (spoof_profile_load(&g_profile, p) == 0) {
-                g_profile_ok = true;
-                LOGI("Loaded profile: %s", p);
-                break;
-            }
-        }
-
-        if (!g_profile_ok)
-            LOGW("No profile loaded; original values will be preserved");
-        else
-            LOGI("Profile ready: model=%s country=%s locale=%s", g_profile.model, g_profile.country_iso, g_profile.locale);
+        load_profile_if_needed();
     }
 
     void postServerSpecialize(const zygisk::ServerSpecializeArgs *) override {
-        if (!g_profile_ok || !g_api || !g_env) return;
-
-        install_system_property_hooks();
-        install_sem_system_properties_hooks();
-        apply_build_fields();
-        verify_serial_and_country_apis();
-        LOGI("Phase 1-3: system_server Zygisk engine initialized safely");
+        initialize_spoof_runtime("system_server");
     }
 };
-
 REGISTER_ZYGISK_MODULE(UniversalSamsungSpoof)
