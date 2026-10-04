@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <unistd.h>
 
 #define TAG "UniversalSamsungSpoof"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -18,6 +19,14 @@ static spoof_profile g_profile;
 static bool g_profile_ok = false;
 static bool g_runtime_initialized = false;
 static bool g_skip_app_runtime = false;
+static bool g_simspoofer_managed = false;
+
+static const char *kSharedConfigPath = "/data/adb/simspoof.prop";
+
+static bool simspoofer_managed() {
+    return access(kSharedConfigPath, F_OK) == 0 ||
+           access("/data/adb/universal-samsung-spoof/simspoofer-managed", F_OK) == 0;
+}
 
 static bool nonempty(const char *s) { return s && *s; }
 
@@ -275,67 +284,104 @@ static void verify_serial_and_country_apis() {
 static bool load_profile_if_needed() {
     if (g_profile_ok) return true;
 
+    // The shared SimSpoofer file is authoritative when present. Do not fall
+    // through to a legacy global profile when it explicitly selects per-app.
+    const char *shared = "/data/adb/simspoof.prop";
+    if (access(shared, F_OK) == 0) {
+        spoof_profile candidate;
+        spoof_profile_init(&candidate);
+        if (spoof_profile_load(&candidate, shared) != 0) {
+            LOGW("Shared SimSpoofer config exists but cannot be parsed; fail closed");
+            return false;
+        }
+        if (strcmp(candidate.scope, "global") != 0) {
+            LOGI("Shared config is not global (scope=%s); global runtime disabled",
+                 candidate.scope[0] ? candidate.scope : "unset");
+            return false;
+        }
+        g_profile = candidate;
+        g_profile_ok = true;
+        LOGI("Loaded shared global profile: %s", shared);
+        return true;
+    }
+
     const char *paths[] = {
         "/data/adb/universal-samsung-spoof/profile.prop",
         "/data/adb/modules/universal-samsung-spoof/profile.prop",
-        "/data/local/tmp/universal-samsung-spoof/profile.prop"
+        "/data/local/tmp/universal-samsung-spoof/profile.prop",
+        "/system/spoof.prop"
     };
-
     for (const char *path : paths) {
         spoof_profile candidate;
         spoof_profile_init(&candidate);
         if (spoof_profile_load(&candidate, path) != 0) continue;
-
-        // Preserve the legacy global behavior when scope is absent. Users can
-        // explicitly restrict the global profile with scope=per_app; unknown
-        // scope values fail closed instead of being interpreted as global.
-        if (strcmp(candidate.scope, "per_app") == 0) {
-            LOGI("Global profile disabled by scope=per_app: %s", path);
-            continue;
-        }
-        if (candidate.scope[0] != '\0' && strcmp(candidate.scope, "global") != 0) {
-            LOGW("Unknown global profile scope; ignoring profile: %s", path);
-            continue;
-        }
-
+        if (strcmp(candidate.scope, "per_app") == 0) return false;
+        if (candidate.scope[0] != '\0' && strcmp(candidate.scope, "global") != 0) return false;
         g_profile = candidate;
         g_profile_ok = true;
-        LOGI("Loaded global profile: %s", path);
-        LOGI("Profile ready: model=%s country=%s locale=%s",
-             g_profile.model, g_profile.country_iso, g_profile.locale);
+        LOGI("Loaded legacy global profile: %s", path);
         return true;
     }
-
     LOGI("No usable global profile; only explicit per-app Native profiles can run");
     return false;
 }
 
 static bool load_app_profile_for_package(const std::string &package_name) {
     if (package_name.empty()) return false;
-    const std::string path = "/data/adb/universal-samsung-spoof/profiles/" + package_name + ".prop";
     spoof_profile candidate;
     spoof_profile_init(&candidate);
-    if (spoof_profile_load(&candidate, path.c_str()) != 0) return false;
+    int shared_result = spoof_profile_load_for_package(&candidate, kSharedConfigPath, package_name.c_str());
+    if (shared_result == 0) {
+        if (strcmp(candidate.active, "true") != 0 && strcmp(candidate.active, "1") != 0) {
+            g_skip_app_runtime = true;
+            g_profile_ok = false;
+            LOGI("Shared config has no explicit active=true for %s; skipping", package_name.c_str());
+            return true;
+        }
+        if (strcmp(candidate.allowed, "true") != 0 && strcmp(candidate.allowed, "1") != 0) {
+            g_skip_app_runtime = true;
+            g_profile_ok = false;
+            LOGI("Shared config does not allow %s in the SimSpoofer profile list; skipping", package_name.c_str());
+            return true;
+        }
+        if (!strcmp(candidate.hook_mode, "lsposed")) {
+            g_skip_app_runtime = true;
+            g_profile_ok = false;
+            LOGI("Shared config selects LSPosed for %s; skipping Zygisk app hooks", package_name.c_str());
+            return true;
+        }
+        if (strcmp(candidate.hook_mode, "native") != 0) {
+            g_skip_app_runtime = true;
+            g_profile_ok = false;
+            LOGW("Unknown hook_mode for %s in shared config; fail closed", package_name.c_str());
+            return true;
+        }
+        g_profile = candidate;
+        g_profile_ok = true;
+        g_skip_app_runtime = false;
+        LOGI("Loaded shared per-app Native profile for %s", package_name.c_str());
+        return true;
+    }
 
+    // A shared file means SimSpoofer owns the scope. Missing app records must
+    // never fall back to stale per-app cache files or a global profile.
+    if (access(kSharedConfigPath, F_OK) == 0) return false;
+
+    const std::string path = "/data/adb/universal-samsung-spoof/profiles/" + package_name + ".prop";
+    spoof_profile_init(&candidate);
+    if (spoof_profile_load(&candidate, path.c_str()) != 0) return false;
     if (!strcmp(candidate.hook_mode, "lsposed")) {
-        g_skip_app_runtime = true;
-        g_profile_ok = false;
-        LOGI("Per-app mode is LSPosed; skipping Zygisk app hooks for %s", package_name.c_str());
+        g_skip_app_runtime = true; g_profile_ok = false;
+        LOGI("Legacy per-app mode is LSPosed; skipping %s", package_name.c_str());
         return true;
     }
     if (strcmp(candidate.hook_mode, "native") != 0) {
-        // A present but invalid per-app record must not fall through to the
-        // global profile; fail closed to avoid spoofing an unintended app.
-        g_skip_app_runtime = true;
-        g_profile_ok = false;
-        LOGW("Unknown hook_mode in %s; skipping Zygisk app runtime", path.c_str());
+        g_skip_app_runtime = true; g_profile_ok = false;
+        LOGW("Unknown hook_mode in %s; skipping Zygisk runtime", path.c_str());
         return true;
     }
-
-    g_profile = candidate;
-    g_profile_ok = true;
-    g_skip_app_runtime = false;
-    LOGI("Loaded per-app Native profile for %s", package_name.c_str());
+    g_profile = candidate; g_profile_ok = true; g_skip_app_runtime = false;
+    LOGI("Loaded legacy per-app Native profile for %s", package_name.c_str());
     return true;
 }
 
@@ -366,10 +412,19 @@ public:
         std::string process_name = args && args->nice_name ? jstr(g_env, args->nice_name) : std::string();
         size_t colon = process_name.find(':');
         std::string package_name = process_name.substr(0, colon);
+        g_simspoofer_managed = simspoofer_managed();
         if (!load_app_profile_for_package(package_name)) {
-            // Apps without a per-app record retain the legacy global behavior
-            // unless the global profile explicitly uses scope=per_app.
-            load_profile_if_needed();
+            if (g_simspoofer_managed) {
+                // Once SimSpoofer has claimed profile ownership, apps without an
+                // explicit per-app file must never inherit the global profile.
+                g_skip_app_runtime = true;
+                g_profile_ok = false;
+                LOGI("SimSpoofer-managed mode: no per-app profile for %s; skipping", package_name.c_str());
+            } else {
+                // Standalone/legacy mode is unchanged until SimSpoofer writes
+                // its management marker.
+                load_profile_if_needed();
+            }
         }
     }
 
@@ -379,10 +434,17 @@ public:
     }
 
     void preServerSpecialize(zygisk::ServerSpecializeArgs *) override {
+        g_simspoofer_managed = simspoofer_managed();
+        if (g_simspoofer_managed) {
+            g_profile_ok = false;
+            LOGI("SimSpoofer-managed mode: skipping global system_server profile");
+            return;
+        }
         load_profile_if_needed();
     }
 
     void postServerSpecialize(const zygisk::ServerSpecializeArgs *) override {
+        if (g_simspoofer_managed) return;
         initialize_spoof_runtime("system_server");
     }
 };
