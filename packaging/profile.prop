@@ -1,4 +1,5 @@
 # Replace these values with the selected Device Spoofing profile.
+# Add scope=global only if you intentionally want all-app/system_server behavior.
 model=SM-S928B
 brand=samsung
 device=e3q
@@ -11,5 +12,4 @@ bootloader=S928BXXU
 locale=en-US
 country=United States
 country_iso=US
-country_iso_lower=us
 serial=UNIVERSAL-SPOOF
