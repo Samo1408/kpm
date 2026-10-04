@@ -90,6 +90,8 @@ jobs:
 
           CFLAGS := -O2 -fno-PIC -fno-asynchronous-unwind-tables -fno-stack-protector -ffreestanding
           CFLAGS += -I$(KP_DIR)/kernel/include
+          CFLAGS += -I$(KP_DIR)/kernel/patch/include
+          CFLAGS += -I$(KP_DIR)/kernel/patch/include/uapi
           CFLAGS += -I$(KP_DIR)/kernel/arch/arm64/include
           CFLAGS += -I$(KP_DIR)/kernel/arch/arm64/include/generated
           CFLAGS += -I$(KP_DIR)/kernel/include/generated
@@ -108,6 +110,8 @@ jobs:
           clean:
           	rm -f *.o *.kpm
           EOF
+          test -f KernelPatch/kernel/patch/include/uapi/scdefs.h
+          echo "Verified: KernelPatch/kernel/patch/include/uapi/scdefs.h"
 
       - name: Build KPM
         shell: bash
