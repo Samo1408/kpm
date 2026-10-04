@@ -1,20 +1,20 @@
-# Alpha 2 Hook Matrix
+# Hook Matrix — Phase 4
 
-| Target | Mechanism | Status |
-|---|---|---|
-| `android.os.SystemProperties.native_get` | Zygisk JNI native hook | Implemented |
-| `native_get(String,String)` | Zygisk JNI native hook | Implemented |
-| `native_get_int` | Hook/fallback wrapper | Implemented |
-| `native_get_long` | Hook/fallback wrapper | Implemented |
-| `native_get_boolean` | Hook/fallback wrapper | Implemented |
-| `android.os.Build.MODEL` | Static field replacement | Implemented |
-| `Build.BRAND/DEVICE/PRODUCT` | Static field replacement | Implemented |
-| `Build.MANUFACTURER/BOARD/HARDWARE` | Static field replacement | Implemented |
-| `Build.BOOTLOADER` | Static field replacement | Implemented |
-| `ro.product.locale` | SystemProperties | Implemented |
-| `ro.serialno` | SystemProperties | Implemented |
-| `ril.serialnumber` | SystemProperties | Implemented |
-| `gsm.*.iso-country` | SystemProperties | Implemented |
-| Telephony Java methods | Zygisk | Next stage |
-| Samsung `SemSystemProperties` Java API | Zygisk | Next stage |
-| Kernel hardware identifiers | KPM | Intentionally disabled pending target symbol |
+| Area | API / property | Mechanism | Status | Fallback |
+|---|---|---|---|---|
+| Build | `android.os.Build` static fields | JNI field update | active | original field |
+| SystemProperties | `native_get(String)` | Zygisk JNI native hook | active/probed | original |
+| SystemProperties | `native_get(String,String)` | Zygisk JNI native hook | active/probed | original |
+| SystemProperties | `native_get_int/long/boolean` | Zygisk JNI native hook | active/probed | original |
+| Samsung | `android.os.SemSystemProperties` native variants | Zygisk JNI native hook | probed | original |
+| Serial | `ro.serialno` | property layer | active | original |
+| Serial | `ril.serialnumber` | property layer | active | original |
+| Serial | `sys.serialnumber` | property layer | active | original |
+| Build serial | `Build.getSerial()` | runtime presence check | detected, not ART-patched | property layer |
+| Country | `gsm.operator.iso-country` | property layer | active | original |
+| Country | `gsm.sim.operator.iso-country` | property layer | active | original |
+| Country | `persist.sys.country` | property layer | active | original |
+| Country | `ro.product.locale.region` | property layer | active | original |
+| Telephony | `getNetworkCountryIso()` | runtime presence check | detected | property layer |
+| Telephony | `getNetworkCountryIso(int)` | runtime presence check | detected | property layer |
+| Telephony | `getSimCountryIso()` | runtime presence check | detected | property layer |
