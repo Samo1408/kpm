@@ -34,3 +34,10 @@ country=United States
 country_iso=US
 serial=UNIVERSAL-SPOOF
 ```
+
+
+## GitHub Actions toolchain fix
+
+The workflow does not use Ubuntu packages for `aarch64-none-elf`.
+It downloads Arm GNU Toolchain 14.3.rel1 for the GitHub runner and places
+`aarch64-none-elf-*` on PATH before building the KPM.
