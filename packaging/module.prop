@@ -1,6 +1,7 @@
 id=universal-samsung-spoof
 name=Universal Samsung Spoof
-version=0.4.0-shared-config
-versionCode=4
+version=0.5.0-webui
+versionCode=5
 author=Universal-Samsung-Spoof
-description=Universal Samsung Android 14 spoof engine using native Zygisk system_server hooks.
+description=Per-app Zygisk property spoofing with an in-module WebUI for supported root managers.
+webui=true
